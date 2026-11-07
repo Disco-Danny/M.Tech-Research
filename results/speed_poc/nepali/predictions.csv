@@ -1,0 +1,6 @@
+path,label,group,All frames,Uniform 8,Adaptive 4 to 8
+External_Data_NS23/test_GA_S1.mov,GA,S1,GA,GA,GA
+External_Data_NS23/test_KA_S1.mov,KA,S1,PHA,GA,GA
+External_Data_NS23/test_LA_S1.mov,LA,S1,GA,GA,PHA
+External_Data_NS23/test_PHA_S1.mov,PHA,S1,PHA,PHA,PHA
+External_Data_NS23/test_RA_S1.mov,RA,S1,RA,RA,RA

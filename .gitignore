@@ -1,0 +1,16 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.DS_Store
+.env
+.env.*
+!.env.example
+cache/
+professor_review_*/
+build_architecture_report.py
+build_review_presentation.py
+Cropped_Data/
+External_Data_NS23/
+data_checksums.csv

@@ -1,0 +1,753 @@
+{
+  "language": "ISL",
+  "classes": [
+    "accident",
+    "call",
+    "doctor",
+    "help",
+    "hot",
+    "lose",
+    "pain",
+    "thief"
+  ],
+  "clips": 412,
+  "test_clips": 412,
+  "timing_repeats": 2,
+  "folds": [
+    {
+      "fold": 1,
+      "threshold": 948.5649169921878,
+      "gate_validation_clips": 112,
+      "gate_validation_reject_rate": 0.05357142857142857,
+      "train_groups": [
+        "001",
+        "002",
+        "003",
+        "005",
+        "006",
+        "007",
+        "008",
+        "010",
+        "011",
+        "012",
+        "013",
+        "015",
+        "016",
+        "017",
+        "018",
+        "021",
+        "022",
+        "023",
+        "024",
+        "025"
+      ],
+      "test_groups": [
+        "004",
+        "009",
+        "014",
+        "019",
+        "020",
+        "026"
+      ],
+      "calibration_seconds": 0.13039858300000162,
+      "training_seconds": {
+        "dense": 0.083429584000001,
+        "full": 0.07625883299999714,
+        "coarse": 0.07919950000000142
+      }
+    },
+    {
+      "fold": 2,
+      "threshold": 1042.245947265625,
+      "gate_validation_clips": 110,
+      "gate_validation_reject_rate": 0.05454545454545454,
+      "train_groups": [
+        "001",
+        "002",
+        "003",
+        "004",
+        "006",
+        "007",
+        "008",
+        "009",
+        "011",
+        "012",
+        "013",
+        "014",
+        "016",
+        "017",
+        "018",
+        "019",
+        "020",
+        "022",
+        "023",
+        "024",
+        "026"
+      ],
+      "test_groups": [
+        "005",
+        "010",
+        "015",
+        "021",
+        "025"
+      ],
+      "calibration_seconds": 0.13561837500000706,
+      "training_seconds": {
+        "dense": 0.08299195899999745,
+        "full": 0.07723154200000693,
+        "coarse": 0.08239770800000201
+      }
+    },
+    {
+      "fold": 3,
+      "threshold": 0.0,
+      "gate_validation_clips": 110,
+      "gate_validation_reject_rate": 0.0,
+      "train_groups": [
+        "002",
+        "003",
+        "004",
+        "005",
+        "007",
+        "008",
+        "009",
+        "010",
+        "012",
+        "013",
+        "014",
+        "015",
+        "016",
+        "018",
+        "019",
+        "020",
+        "021",
+        "022",
+        "024",
+        "025",
+        "026"
+      ],
+      "test_groups": [
+        "001",
+        "006",
+        "011",
+        "017",
+        "023"
+      ],
+      "calibration_seconds": 0.13345791599999757,
+      "training_seconds": {
+        "dense": 0.08452950000000214,
+        "full": 0.07710616700001083,
+        "coarse": 0.08274562500000116
+      }
+    },
+    {
+      "fold": 4,
+      "threshold": 0.0,
+      "gate_validation_clips": 110,
+      "gate_validation_reject_rate": 0.0,
+      "train_groups": [
+        "001",
+        "003",
+        "004",
+        "005",
+        "006",
+        "008",
+        "009",
+        "010",
+        "011",
+        "013",
+        "014",
+        "015",
+        "017",
+        "018",
+        "019",
+        "020",
+        "021",
+        "023",
+        "024",
+        "025",
+        "026"
+      ],
+      "test_groups": [
+        "002",
+        "007",
+        "012",
+        "016",
+        "022"
+      ],
+      "calibration_seconds": 0.14120154200000457,
+      "training_seconds": {
+        "dense": 0.08397720900001104,
+        "full": 0.08267383399999062,
+        "coarse": 0.08553337499998293
+      }
+    },
+    {
+      "fold": 5,
+      "threshold": 0.0,
+      "gate_validation_clips": 110,
+      "gate_validation_reject_rate": 0.0,
+      "train_groups": [
+        "001",
+        "002",
+        "004",
+        "005",
+        "006",
+        "007",
+        "009",
+        "010",
+        "011",
+        "012",
+        "014",
+        "015",
+        "016",
+        "017",
+        "019",
+        "020",
+        "021",
+        "022",
+        "023",
+        "025",
+        "026"
+      ],
+      "test_groups": [
+        "003",
+        "008",
+        "013",
+        "018",
+        "024"
+      ],
+      "calibration_seconds": 0.13401799999999753,
+      "training_seconds": {
+        "dense": 0.08673437500002024,
+        "full": 0.08241941700001121,
+        "coarse": 0.08684216700001457
+      }
+    }
+  ],
+  "results": {
+    "All frames": {
+      "accuracy": 0.9320388349514563,
+      "balanced_accuracy": 0.9326923076923077,
+      "macro_precision": 0.932099883552023,
+      "macro_recall": 0.9326923076923077,
+      "macro_f1": 0.9315595172654423,
+      "weighted_f1": 0.9312231424430377,
+      "kappa": 0.9223342803667847,
+      "mcc": 0.9225703169733561,
+      "correct": 384,
+      "test_clips": 412,
+      "mean_ms": 147.76563979611663,
+      "median_ms": 145.42583350000626,
+      "p95_ms": 190.12535185000272,
+      "clips_per_second": 6.767473151266933,
+      "decode_ms": 138.45720509708806,
+      "feature_policy_ms": 8.982100290048713,
+      "model_ms": 0.3263344089798547,
+      "mean_frames": 77.47330097087378,
+      "mean_hog_calls": 153.94660194174756,
+      "mean_decoded": 77.47330097087378,
+      "mean_retrieved": 77.47330097087378,
+      "gray_buffer_kib": 174.314927184466,
+      "rescue_rate": 0.0,
+      "model_kib": 161.19921875,
+      "training_seconds": 0.4216626270000319,
+      "per_class": {
+        "accident": {
+          "precision": 0.9423076923076923,
+          "recall": 0.9423076923076923,
+          "f1-score": 0.9423076923076923,
+          "support": 52.0
+        },
+        "call": {
+          "precision": 0.9166666666666666,
+          "recall": 0.8461538461538461,
+          "f1-score": 0.88,
+          "support": 52.0
+        },
+        "doctor": {
+          "precision": 0.8909090909090909,
+          "recall": 0.9423076923076923,
+          "f1-score": 0.9158878504672897,
+          "support": 52.0
+        },
+        "help": {
+          "precision": 0.9423076923076923,
+          "recall": 0.9423076923076923,
+          "f1-score": 0.9423076923076923,
+          "support": 52.0
+        },
+        "hot": {
+          "precision": 0.9803921568627451,
+          "recall": 0.9615384615384616,
+          "f1-score": 0.970873786407767,
+          "support": 52.0
+        },
+        "lose": {
+          "precision": 0.9433962264150944,
+          "recall": 1.0,
+          "f1-score": 0.970873786407767,
+          "support": 50.0
+        },
+        "pain": {
+          "precision": 0.9148936170212766,
+          "recall": 0.8269230769230769,
+          "f1-score": 0.8686868686868687,
+          "support": 52.0
+        },
+        "thief": {
+          "precision": 0.9259259259259259,
+          "recall": 1.0,
+          "f1-score": 0.9615384615384616,
+          "support": 50.0
+        },
+        "accuracy": 0.9320388349514563,
+        "macro avg": {
+          "precision": 0.932099883552023,
+          "recall": 0.9326923076923077,
+          "f1-score": 0.9315595172654423,
+          "support": 412.0
+        },
+        "weighted avg": {
+          "precision": 0.9320750176042707,
+          "recall": 0.9320388349514563,
+          "f1-score": 0.9312231424430377,
+          "support": 412.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          49,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2
+        ],
+        [
+          1,
+          44,
+          1,
+          0,
+          0,
+          0,
+          4,
+          2
+        ],
+        [
+          2,
+          0,
+          49,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          2,
+          49,
+          1,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          2,
+          50,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          50,
+          0,
+          0
+        ],
+        [
+          0,
+          4,
+          3,
+          0,
+          0,
+          2,
+          43,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          50
+        ]
+      ],
+      "speedup_vs_all": 1.0
+    },
+    "Uniform 8": {
+      "accuracy": 0.9174757281553398,
+      "balanced_accuracy": 0.9182692307692308,
+      "macro_precision": 0.91737035375909,
+      "macro_recall": 0.9182692307692308,
+      "macro_f1": 0.9164329846857645,
+      "weighted_f1": 0.9160395213627165,
+      "kappa": 0.9056941658026902,
+      "mcc": 0.9060907150826486,
+      "correct": 378,
+      "test_clips": 412,
+      "mean_ms": 46.56277314441758,
+      "median_ms": 46.1343544999977,
+      "p95_ms": 57.02384820000499,
+      "clips_per_second": 21.476384082589597,
+      "decode_ms": 45.21762588834987,
+      "feature_policy_ms": 1.0295475473298914,
+      "model_ms": 0.3155997087378071,
+      "mean_frames": 8.0,
+      "mean_hog_calls": 15.0,
+      "mean_decoded": 77.47330097087378,
+      "mean_retrieved": 8.0,
+      "gray_buffer_kib": 18.0,
+      "rescue_rate": 0.0,
+      "model_kib": 161.1982421875,
+      "training_seconds": 0.3956897930000167,
+      "per_class": {
+        "accident": {
+          "precision": 1.0,
+          "recall": 0.9423076923076923,
+          "f1-score": 0.9702970297029703,
+          "support": 52.0
+        },
+        "call": {
+          "precision": 0.8723404255319149,
+          "recall": 0.7884615384615384,
+          "f1-score": 0.8282828282828283,
+          "support": 52.0
+        },
+        "doctor": {
+          "precision": 0.8947368421052632,
+          "recall": 0.9807692307692307,
+          "f1-score": 0.9357798165137615,
+          "support": 52.0
+        },
+        "help": {
+          "precision": 0.94,
+          "recall": 0.9038461538461539,
+          "f1-score": 0.9215686274509803,
+          "support": 52.0
+        },
+        "hot": {
+          "precision": 0.9245283018867925,
+          "recall": 0.9423076923076923,
+          "f1-score": 0.9333333333333333,
+          "support": 52.0
+        },
+        "lose": {
+          "precision": 0.9259259259259259,
+          "recall": 1.0,
+          "f1-score": 0.9615384615384616,
+          "support": 50.0
+        },
+        "pain": {
+          "precision": 0.8723404255319149,
+          "recall": 0.7884615384615384,
+          "f1-score": 0.8282828282828283,
+          "support": 52.0
+        },
+        "thief": {
+          "precision": 0.9090909090909091,
+          "recall": 1.0,
+          "f1-score": 0.9523809523809523,
+          "support": 50.0
+        },
+        "accuracy": 0.9174757281553398,
+        "macro avg": {
+          "precision": 0.91737035375909,
+          "recall": 0.9182692307692308,
+          "f1-score": 0.9164329846857645,
+          "support": 412.0
+        },
+        "weighted avg": {
+          "precision": 0.9173690133343393,
+          "recall": 0.9174757281553398,
+          "f1-score": 0.9160395213627165,
+          "support": 412.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          49,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          3
+        ],
+        [
+          0,
+          41,
+          1,
+          0,
+          1,
+          1,
+          6,
+          2
+        ],
+        [
+          0,
+          0,
+          51,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          3,
+          47,
+          2,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          2,
+          49,
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          50,
+          0,
+          0
+        ],
+        [
+          0,
+          6,
+          2,
+          0,
+          1,
+          2,
+          41,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          50
+        ]
+      ],
+      "speedup_vs_all": 3.173471634470987
+    },
+    "Adaptive 4 to 8": {
+      "accuracy": 0.912621359223301,
+      "balanced_accuracy": 0.9134615384615384,
+      "macro_precision": 0.9115419863824119,
+      "macro_recall": 0.9134615384615384,
+      "macro_f1": 0.9109277069205688,
+      "weighted_f1": 0.9105688634013701,
+      "kappa": 0.9001494526800501,
+      "mcc": 0.9005981639218741,
+      "correct": 376,
+      "test_clips": 412,
+      "mean_ms": 46.094644277912984,
+      "median_ms": 45.68385400000352,
+      "p95_ms": 56.01356440000273,
+      "clips_per_second": 21.694494353201172,
+      "decode_ms": 45.15346182160173,
+      "feature_policy_ms": 0.6246354417482978,
+      "model_ms": 0.31654701456296014,
+      "mean_frames": 4.106796116504855,
+      "mean_hog_calls": 7.293689320388349,
+      "mean_decoded": 77.47330097087378,
+      "mean_retrieved": 8.0,
+      "gray_buffer_kib": 18.0,
+      "rescue_rate": 0.02669902912621359,
+      "model_kib": 321.6943359375,
+      "training_seconds": 1.4871025840000272,
+      "per_class": {
+        "accident": {
+          "precision": 0.98,
+          "recall": 0.9423076923076923,
+          "f1-score": 0.9607843137254902,
+          "support": 52.0
+        },
+        "call": {
+          "precision": 0.8666666666666667,
+          "recall": 0.75,
+          "f1-score": 0.8041237113402062,
+          "support": 52.0
+        },
+        "doctor": {
+          "precision": 0.9272727272727272,
+          "recall": 0.9807692307692307,
+          "f1-score": 0.9532710280373832,
+          "support": 52.0
+        },
+        "help": {
+          "precision": 0.9230769230769231,
+          "recall": 0.9230769230769231,
+          "f1-score": 0.9230769230769231,
+          "support": 52.0
+        },
+        "hot": {
+          "precision": 0.9423076923076923,
+          "recall": 0.9423076923076923,
+          "f1-score": 0.9423076923076923,
+          "support": 52.0
+        },
+        "lose": {
+          "precision": 0.8928571428571429,
+          "recall": 1.0,
+          "f1-score": 0.9433962264150944,
+          "support": 50.0
+        },
+        "pain": {
+          "precision": 0.851063829787234,
+          "recall": 0.7692307692307693,
+          "f1-score": 0.8080808080808081,
+          "support": 52.0
+        },
+        "thief": {
+          "precision": 0.9090909090909091,
+          "recall": 1.0,
+          "f1-score": 0.9523809523809523,
+          "support": 50.0
+        },
+        "accuracy": 0.912621359223301,
+        "macro avg": {
+          "precision": 0.9115419863824119,
+          "recall": 0.9134615384615384,
+          "f1-score": 0.9109277069205688,
+          "support": 412.0
+        },
+        "weighted avg": {
+          "precision": 0.9116445879397749,
+          "recall": 0.912621359223301,
+          "f1-score": 0.9105688634013701,
+          "support": 412.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          49,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2
+        ],
+        [
+          1,
+          39,
+          1,
+          0,
+          0,
+          2,
+          7,
+          2
+        ],
+        [
+          0,
+          0,
+          51,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          2,
+          48,
+          2,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          2,
+          49,
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          50,
+          0,
+          0
+        ],
+        [
+          0,
+          6,
+          1,
+          1,
+          1,
+          2,
+          40,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          50
+        ]
+      ],
+      "speedup_vs_all": 3.205700838154011
+    }
+  },
+  "device": "macOS-26.7.2-arm64-arm-64bit",
+  "opencv": "4.11.0",
+  "protocol": "ISL grouped OOF",
+  "limits": "All compressed frames are traversed with read/grab; sampled methods retrieve/resize only selected images. Incorrect frame-count metadata triggers a full-read fallback. OS file caches may be warm; descriptor caches are not reused between methods. Margin gaps are not probabilities. Validation permits a 0.02 macro-F1 drop, not a test guarantee. Cascade trains two classifiers and may spend more time on rescued clips. HOG is a simplified cell-normalized variant, not exact Dalal-Triggs HOG."
+}

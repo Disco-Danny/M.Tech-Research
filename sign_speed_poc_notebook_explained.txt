@@ -1,0 +1,867 @@
+SIGN_SPEED_POC.IPYNB EXPLAINED CELL BY CELL
+========================================
+Guide checked against the current 16-cell notebook and saved results on
+7 October 2026. Cell numbers refer to the notebook's visible order, counting
+both text cells and code cells. They are NOT execution counts.
+
+This guide is about sign_speed_poc.ipynb, not the older frame_selection.ipynb.
+For a deeper explanation of the helper's individual functions, read
+speed_poc_py_explained.txt. This guide can also be read on its own.
+
+CONTENTS
+1. What a notebook is and how ours works
+2. The project in very simple language
+3. Important terms before reading the outputs
+4. The correct run order
+5. Cell 1: project overview
+6. Cell 2: setup, dataset counts, and saved versus new results
+7. Cell 3: the animated method comparison
+8. Cell 4: evaluation rules and dataset limitations
+9. Cells 5 and 6: quality tables and their explanation
+10. Cells 7, 8, and 9: speed/work tables, plots, and explanation
+11. Cells 10 and 11: class-level errors and confusion matrices
+12. Cells 12 and 13: gate settings and explanation
+13. Cell 14: the result takeaway
+14. Cells 15 and 16: limitations and references
+15. Design choices, pros, cons, and alternatives
+16. Troubleshooting and a short review script
+
+
+1. WHAT A NOTEBOOK IS AND HOW OURS WORKS
+--------------------------------------
+A Jupyter notebook combines explanatory text, executable code, tables,
+images, and other outputs in one document.
+
+A markdown cell displays formatted explanation. It does not train a model.
+A code cell runs Python. Its results appear below it.
+The kernel is the running Python process that holds imported libraries,
+variables, models, and figures in memory.
+
+Example:
+  Cell 2 creates REPORTS.
+  Cell 5 uses REPORTS.
+If Cell 2 has not run in the current kernel, Cell 5 cannot use that variable.
+Saved visible outputs can exist even when the current kernel has no variables.
+
+Execution count:
+The number beside an executed code cell shows execution order, not document
+position. A newly inserted animation may have a larger execution count than
+later cells. This does not change its visible position as Cell 3.
+
+Our notebook is a presentation and control layer. Most image processing and
+training is defined in speed_poc.py. The notebook calls that helper and
+displays its results. It is not a second independent implementation.
+
+Default code flow:
+  Cell 2 -> import helper -> verify basic assumptions -> load saved reports
+  Cell 3 -> load one saved fold model -> make a visual demonstration
+  Cells 5 onward -> display quality, speed, errors, gate settings, conclusions
+
+Full rerun flow:
+  Cell 2 with RERUN=True -> helper trains and measures the complete experiment
+  -> new artifacts are saved -> later cells display those new reports
+
+
+2. THE PROJECT IN VERY SIMPLE LANGUAGE
+-------------------------------------
+We have short labeled sign videos. We want to predict which sign is shown.
+The video is one example. Its images are called frames.
+
+Our question:
+Do we have to describe eight images for every video, or can many videos be
+classified after describing only four images?
+
+Three methods:
+  All frames: calculate image features for the entire video.
+  Uniform 8: calculate features for eight evenly spaced images.
+  Adaptive 4 to 8: calculate four first, check the classifier's score gap,
+                   and calculate the remaining four if the gap is small.
+
+The features describe local edge directions. The classifier learns which
+patterns tend to appear in clips with each label.
+
+Our current system is not a sign-language translator. It predicts isolated
+words for the ISL subset and alphabet signs for the Nepali subset. It does
+not understand grammar, continuous sentences, or conversations.
+
+The current notebook does NOT use MediaPipe, GRU, CNN, or Neural CDE.
+Its classifier is a linear SGD model with hinge loss. Earlier versions of
+the project explored those other technologies, but they are not the methods
+in the current speed comparison.
+
+
+3. IMPORTANT TERMS BEFORE READING THE OUTPUTS
+-------------------------------------------
+Frame: one image from a video.
+Feature: a numerical description of something in an image.
+Descriptor: a collection of such features, here 324 numbers per image.
+Class: one possible sign label, such as doctor.
+Prediction: the label chosen by the classifier.
+Ground truth: the known correct label attached to the clip.
+Support: how many real test examples a class has.
+Inference: using an already trained model to predict, not training it.
+Latency: how long one measured processing run takes.
+Throughput: how many clips could be processed per second serially at that rate.
+Baseline: an established simple method used as a reference.
+Rescue: requesting additional features and using the eight-frame classifier.
+Fold: one training/test partition used in cross-validation.
+OOF: out-of-fold prediction, made when that example's group was held out.
+
+What are bins?
+There are TWO meanings in this project:
+
+  Direction bins:
+    Divide edge angles from 0 to below 180 degrees into nine 20-degree ranges.
+    A 47-degree edge belongs to the 40-to-below-60-degree bin.
+    The histogram adds edge strength, not class votes, to that category.
+
+  Temporal bins:
+    The all-frame pipeline groups descriptors into eight consecutive sections
+    of the video and averages each section. These preserve rough order.
+    The Uniform 8 pipeline instead selects eight actual images.
+
+Do not confuse the nine edge-direction bins with eight temporal positions,
+eight ISL classes, or the eight selected video frames.
+
+Feature sizes:
+  Image size: 48 by 48 grayscale pixels.
+  Spatial cells: 6 by 6; each cell covers 8 by 8 pixels.
+  Direction histogram: 9 bins in each of 36 cells.
+  One image descriptor: 36 * 9 = 324 numbers.
+  One clip: 8 * 324 frame features + 324 transition features = 2,916 numbers.
+
+Four-frame features are numerically interpolated to eight positions.
+Interpolation creates intermediate feature values, not new visual evidence.
+
+What classifier is used, and why?
+StandardScaler followed by SGDClassifier(loss="hinge"). It learns a linear
+score for each class using one-versus-rest training. The largest score wins.
+SGD is the optimizer. Hinge loss gives an SVM-style margin-based objective.
+This is not a kernel SVM, neural network, or probability-based classifier.
+
+Why this choice?
+It is easy to train, CPU-friendly, and works well enough for a small local
+proof of concept. A large neural model would complicate a speed-first review.
+The trade-off is a less expressive learned representation and possible
+background shortcuts.
+
+What is hinge loss?
+Loss guides training by penalizing undesirable scores. For a binary
+one-versus-rest decision, basic hinge loss is max(0, 1 - y * score), where
+y is +1 for the target class and -1 for other classes. A correct but weak
+margin still has a penalty; a strongly correct margin can have zero loss.
+Default L2 regularization discourages very large weights.
+
+The training loss is not shown as a curve here. Accuracy and F1 are evaluation
+metrics, not the training loss. No log loss, cross-entropy training, softmax,
+or calibrated probability confidence is used in this notebook.
+
+
+4. THE CORRECT RUN ORDER
+------------------------
+Select a Python kernel with the dependencies in requirements-speed.txt.
+The verified environment is Python (frame-selection-mediapipe), Python 3.9.6.
+The name contains MediaPipe for historical reasons; this notebook does not
+import or run its detector.
+
+Run Cell 2 first. Leave RERUN=False if you only need the completed results.
+Then run Cell 3 for the animation and later code cells for the tables/plots.
+Markdown cells provide context but have no training behavior.
+
+To rerun the experiment:
+  Change RERUN=True in Cell 2.
+  Run Cell 2 and wait for it to finish.
+  Run later code cells to refresh displays.
+
+A full run can take several minutes because videos are repeatedly opened
+and processed for actual timing. It overwrites results/speed_poc artifacts.
+Changing the notebook's flag does nothing until its cell is executed.
+
+If you edit speed_poc.py while a kernel is running, importing it again can
+reuse the old imported module. Restart the kernel and rerun setup when you
+want to be sure code changes have taken effect.
+
+
+5. CELL 1: PROJECT OVERVIEW
+---------------------------
+Type: markdown.
+
+Responsible for:
+Stating the three methods, scope, and candidate contribution before showing
+results. This gives the audience a map of the experiment.
+
+Most important statement:
+  Novelty of this exact combination is not verified.
+
+Why this matters:
+HOG, sparse frame sampling, and conditional computation already exist. Our
+candidate combines them in a small prediction-guided frame-budget policy.
+We should not claim to invent those building blocks or be the first method
+of its kind without an adequate literature review.
+
+Also important:
+All methods use the same simple classifier family, but not one shared fitted
+classifier. Dense, eight-frame, and four-frame representations get separate
+trained pipelines. The candidate needs both four-frame and eight-frame models.
+
+
+6. CELL 2: SETUP, COUNTS, AND SAVED VERSUS NEW RESULTS
+---------------------------------------------------
+Type: code.
+
+Block A: Imports.
+Path handles file paths. json reads reports. NumPy handles numerical arrays.
+pandas makes tables. matplotlib makes plots. Markdown and display show
+formatted output. speed_poc provides the experiment functions.
+
+Block B: Workspace root and dataset index.
+  ROOT = Path.cwd()
+  DATA = speed_poc.datasets(ROOT)
+Path.cwd() means the current working directory, not automatically the folder
+of every notebook file. It needs to be the project folder containing both datasets.
+
+DATA is a dictionary:
+  {"ISL": [records...], "Nepali": [records...]}
+Each record contains video path, label, group, and split.
+
+Block C: Smoke checks.
+  speed_poc.smoke_test(ROOT)
+This checks short clips, fixed feature dimensions, subset relationships,
+split assumptions, both datasets, and selected-frame equality between full
+and sparse video loading. It does not train the complete benchmark.
+Passing smoke checks is not evidence of recognition accuracy or novelty.
+
+Block D: Choose saved or new results.
+  RERUN = False
+  REPORTS = speed_poc.run(ROOT, repeats=2) if RERUN else {...}
+
+Most important line:
+  RERUN = False
+
+False loads metrics.json for each language. True runs actual training,
+gate selection, and independently timed test pipelines.
+The if/else expression runs ONLY its chosen branch.
+
+Block E: Print environment and counts.
+The executable tells us which Python is actually running. Hardware/OpenCV
+information helps interpret timing. Each class-count table reveals imbalance.
+
+Expected dataset counts:
+  ISL: 412 clips, 8 classes, 26 filename groups.
+  Nepali: 15 clips, 5 classes, 3 signer IDs.
+ISL classes have 50 or 52 clips. Each Nepali class has three clips, but only
+one of those is a test clip.
+
+Output format:
+Printed text plus class-count DataFrames, with a nested REPORTS dictionary
+held in kernel memory for later cells.
+
+Important distinction:
+With RERUN=False, the table numbers and reported hardware refer to the saved
+benchmark. They are not a fresh measurement of the current cell execution.
+The printed Python executable is from the live kernel; saved report hardware
+is from the benchmark run. Keep files/models/data consistent when presenting.
+
+
+7. CELL 3: THE ANIMATED METHOD COMPARISON
+---------------------------------------
+Type: code, followed by an HTML animation and explanatory text.
+
+Purpose:
+Make the three methods understandable using one real held-out clip.
+This is a demonstration, not part of the latency benchmark.
+
+Controls:
+  VIS_LANGUAGE = 'ISL'
+  VIS_CLIP = 0
+
+VIS_LANGUAGE can be ISL or Nepali. VIS_CLIP chooses a zero-based position in
+the eligible test list. Zero means the first example.
+For Nepali, the list contains only manifest test clips. For ISL, every clip
+belongs to one outer test fold and has an OOF model available.
+
+Block A: Find the correct evaluation model.
+  visual_fold = next(fold for fold in REPORTS[VIS_LANGUAGE]['folds']
+                     if visual_record['group'] in fold['test_groups'])
+
+This is one of the most important lines in the animation. It selects a model
+for which this clip's group was held out, rather than a model trained on it.
+
+The cell loads fold_N.pkl. Pickle stores Python objects, including fitted
+scalers and classifiers. Only load trusted local files.
+
+Block B: Reproduce the actual adaptive decision.
+  visual_small, visual_full = speed_poc.frame_indices(...)
+  visual_coarse_prediction, visual_gap = speed_poc.decision(...)
+  visual_rescued = bool(visual_gap[0] < visual_saved['threshold'])
+
+The four-frame model's actual score gap is compared with the saved threshold.
+If rescue is True, use the eight-frame prediction. Otherwise keep the
+four-frame prediction. Dense and Uniform 8 predictions are also calculated.
+The visual is therefore based on a real gate decision, not a made-up label.
+
+Block C: Load full-color images for display.
+The benchmark uses 48 by 48 grayscale features. The animation additionally
+loads larger RGB images so a human can see the person clearly.
+These colorful images are for illustration; the model did not train on them
+as a separate color representation in this experiment.
+
+Block D: Define which indices have frame descriptors.
+  visual_sets = [all_indices, uniform_indices, adaptive_indices]
+All frames marks every frame. Uniform marks eight. Adaptive marks four or
+eight according to its actual decision. Short clips can have fewer unique frames.
+
+Block E: Draw three views and three timelines.
+Each panel shows the same preview image, a method name, used-frame count,
+and predicted label. Below it is the full index timeline.
+Colored dots identify frames used for image descriptors.
+The black vertical line identifies the current preview position.
+
+Block F: Animate.
+  visual_images[column_index].set_alpha(1.0 if used else 0.35)
+Bright means a frame IMAGE descriptor is used. Dim means it is skipped by
+that method. The overlay explicitly says FEATURE USED or FEATURE SKIPPED.
+
+Critical interpretation:
+FEATURE SKIPPED does NOT mean the compressed frame was never traversed,
+decoded internally, or used as a dependency by the video codec.
+Both sampled benchmark methods normally retrieve eight images. The adaptive
+method saves descriptors, not necessarily decoder work beyond Uniform 8.
+
+Block G: Display playback controls.
+  visual_animation.to_jshtml()
+converts the matplotlib animation to HTML and JavaScript with controls.
+The preview shows at most 24 selected/spaced positions, not every video frame.
+The timelines still show the complete selection. interval=300 is a display
+delay in milliseconds, not a claim about model speed or original camera FPS.
+
+What is not drawn?
+Dense temporal pooling, interpolation of four descriptors into eight numeric
+positions, and difference-image transition descriptors are not visualized.
+The timeline concerns image descriptors only.
+
+Output example:
+  A 70-frame sample can show 70 / 8 / 4 frame descriptors.
+  Adaptive rescue: False means it kept the four-frame classifier output.
+  A correct prediction on this one sample does not establish overall accuracy.
+
+Why this cell is useful:
+It explains the method visually to reviewers without domain knowledge.
+Why it can make the notebook large:
+JavaScript animation embeds many frame images into the saved output.
+That file size is presentation overhead, not model storage or benchmark RAM.
+
+
+8. CELL 4: EVALUATION RULES AND DATASET LIMITATIONS
+------------------------------------------------
+Type: markdown.
+
+Responsible for explaining how to interpret the evidence before the tables.
+
+ISL:
+Five-fold grouped evaluation. Matching numeric filename IDs stay together.
+Groups help avoid putting related clips on both training and test sides.
+These IDs have not been independently confirmed as signer identities.
+
+Nepali:
+Train on S2/S3, test on S1 using the local manifest. This is signer-held-out
+within the small local subset, not a full NSL23 evaluation.
+
+Most important facts:
+  Five Nepali test clips cannot support a robust accuracy claim.
+  ISL word recognition and Nepali alphabet recognition are different tasks.
+  Test labels do not select the adaptive threshold.
+
+Why not mix both datasets?
+Different label sets and data conditions would make a pooled score hard to
+interpret. Running the same program on two datasets is not proof of a single
+model that transfers between languages.
+
+
+9. CELLS 5 AND 6: QUALITY TABLES AND THEIR EXPLANATION
+---------------------------------------------------
+Cell 5 displays one table for each language.
+Important line:
+  display(speed_poc.table(report, 'quality'))
+It formats saved results; it does not fit or evaluate a fresh classifier.
+
+Each row is a METHOD. Each column is a metric. Scores such as 0.9126 are
+fractions, so multiply by 100 to express them as percentages.
+Some count columns display values like 376.0 because the table's mixed numeric
+format becomes floating point. That still means 376 whole correct clips.
+
+How to read every column:
+
+accuracy:
+  Fraction of all tested clips predicted correctly. 376/412 = about 91.26%.
+  Useful for a simple overall success rate, but can hide minority-class errors.
+
+balanced_accuracy:
+  Average recall of the true classes, with equal class weights.
+  Useful when one class has many more examples than another.
+
+macro_precision:
+  For each sign: among predictions of this label, what fraction were right?
+  Average the sign-specific answers equally.
+  High precision means fewer wrong announcements of a sign.
+
+macro_recall:
+  For each sign: among real examples of this sign, what fraction were found?
+  Average equally. High recall means fewer missed examples.
+
+macro_f1:
+  Calculate F1 for each class, then average equally.
+  F1 balances precision and recall. It is not ordinary arithmetic averaging
+  of those two values. It matters because every sign should contribute to
+  the evaluation, and it is the gate's validation metric.
+
+weighted_f1:
+  Average per-class F1 with weights based on test support.
+  Bigger classes matter more. Compare it to macro F1 for class-size effects.
+
+kappa:
+  Cohen's chance-adjusted agreement using actual/predicted label frequencies.
+  Usually 1 is perfect; around 0 means chance-like agreement under that model.
+
+mcc:
+  Multiclass Matthews correlation coefficient: a correlation-style summary
+  of the whole confusion matrix. 1 is perfect; around 0 is weak correlation.
+  It is a different summary from kappa, not another name for accuracy.
+
+correct:
+  Number of clips predicted correctly. Use it to explain an accuracy change.
+
+test_clips:
+  Actual number of different test clips. It does not double when timing
+  repeats twice. ISL has 412 OOF test predictions; Nepali has five test clips.
+
+Cell 6 places an explanation below the tables.
+Important line:
+  speed_poc.explanation(report, 'quality')
+It builds a sentence from actual report values, then explains the metrics.
+It is templated interpretation, not an independent statistical analysis.
+
+Current saved results:
+  ISL All frames: 384 correct, accuracy 93.20%, macro F1 0.9316.
+  ISL Uniform 8: 378 correct, accuracy 91.75%, macro F1 0.9164.
+  ISL Adaptive: 376 correct, accuracy 91.26%, macro F1 0.9109.
+  Nepali: all three have 3/5 correct, or 60% accuracy.
+  Nepali macro F1: 0.4667, 0.5000, 0.4667 respectively.
+
+What these numbers suggest:
+The candidate stays close to Uniform 8 on ISL but does not improve its accuracy.
+The difference is two clips, about 0.49 percentage points.
+Equal Nepali accuracy does not imply equal per-class errors or equal F1.
+No significance claim follows from these values alone.
+
+
+10. CELLS 7, 8, AND 9: SPEED/WORK TABLES AND EXPLANATION
+-----------------------------------------------------
+Cell 7 is the timing-protocol explanation. Read it before the speed tables.
+The benchmark opens/processes each clip independently for each method.
+Two timing repeats and shuffled method order reduce some measurement effects,
+but do not establish statistically robust latency gains. OS caches may be warm.
+
+Cell 8 displays three smaller cost tables and two plots per language.
+Important line:
+  measured = speed_poc.table(report, 'speed')
+
+TABLE A: TOTAL SPEED
+
+mean_ms:
+  Average time from video open through final prediction. Lower is better.
+median_ms:
+  Middle measured time. Useful when a few slow cases affect the mean.
+p95_ms:
+  Estimated 95th-percentile latency. Roughly 95% of measurements are at or
+  below it. It is not the worst-case time or a guaranteed deadline.
+clips_per_second:
+  1,000 divided by mean milliseconds. Serial clip throughput, NOT camera FPS.
+speedup_vs_all:
+  All-frame mean time divided by this method's mean time. A value above one
+  means faster than All frames, not faster than Uniform 8.
+
+TABLE B: WHERE TIME AND WORK GO
+
+decode_ms:
+  Video open/traversal plus image retrieval, conversion, and resizing.
+feature_policy_ms:
+  Feature extraction plus selection/cache/policy overhead, excluding model calls.
+model_ms:
+  Fitted scaler and classifier calls. A rescued clip can require two calls.
+mean_frames:
+  Average unique image descriptors computed. It does not count all traversal.
+mean_hog_calls:
+  Image descriptors plus difference-image descriptors actually computed.
+rescue_rate:
+  Fraction of test clips expanded to the full eight-frame model.
+  Zero is not automatically good: it can mean an unhelpful gate never rescues.
+
+TABLE C: TRAVERSAL, STORAGE, AND TRAINING
+
+mean_decoded:
+  Despite its name, this is the length of the traversed frame-position list.
+  It is not an instrumented measurement of codec-internal decoding operations.
+mean_retrieved:
+  Number of non-None grayscale images stored after retrieval.
+gray_buffer_kib:
+  Pixel-only storage for the 48 by 48 grayscale images. KiB means 1,024 bytes.
+  Eight images take 18 KiB of stored pixels. This does not include decoder
+  buffers, Python objects or peak process RAM.
+model_kib:
+  Serialized pipeline storage. The candidate includes two classifiers,
+  so it is larger. This is not runtime RAM.
+training_seconds:
+  Final classifier fitting summed over folds. Candidate also includes gate
+  fitting/selection. Shared feature preparation is excluded. It is not the
+  full time needed to build the experiment from scratch.
+
+Plots:
+  Left plot: measured total milliseconds per clip. Shorter bars are faster.
+  Right plot: actual descriptor calls per clip. Shorter bars mean less HOG work.
+These y-axes have different units. A 50% drop in work need not give a 50%
+drop in total time.
+
+Current ISL total times:
+  All frames: 144.22 ms.
+  Uniform 8: 45.12 ms.
+  Adaptive: 44.76 ms.
+
+Current ISL feature/policy times:
+  Uniform 8: about 0.991 ms.
+  Adaptive: about 0.597 ms, approximately 40% less.
+
+Current ISL feature work:
+  Uniform 8: 8 image descriptors, normally 15 total HOG calls.
+  Adaptive: about 4.11 image descriptors and 7.29 total HOG calls.
+  Mean adaptive frame-descriptor reduction is about 48.7%.
+
+Why total improvement is small:
+Sparse video processing still takes around 44 ms on these ISL clips.
+The feature-stage saving is less than half a millisecond. It is a real measured
+stage difference in this run, but is small relative to the rest of the pipeline.
+
+Why both sampled methods are much faster than All frames:
+They retrieve/convert/resize only eight images and compute many fewer features.
+This shared optimization explains much of their gain. Do not attribute the
+candidate's 3.22x dense-baseline speed ratio entirely to the adaptive gate.
+
+Current Nepali total times:
+  All frames: 144.78 ms.
+  Uniform 8: 22.73 ms.
+  Adaptive: 21.31 ms.
+Only five clips were tested. Their timing distribution is weak evidence.
+
+Cell 9 provides the plain-English interpretation immediately below this block.
+It explains units and explicitly says less work need not mean less total time.
+
+
+11. CELLS 10 AND 11: CLASS ERRORS AND CONFUSION MATRICES
+-----------------------------------------------------
+Cell 10 displays a per-class table for each method and a three-panel matrix
+figure for each language.
+
+Important table line:
+  pd.DataFrame({label: result['per_class'][label] for label in classes}).T
+It changes a dictionary into a table and transposes it so labels become rows.
+
+Per-class columns:
+  precision: how reliable predictions of this label are.
+  recall: how many real examples of this label are recovered.
+  f1-score: balance of the two.
+  support: number of real test examples of this label.
+
+An actual ISL example for the candidate:
+  call has 52 test examples and recall 0.750.
+  It correctly recovers 39 of those 52 examples.
+  Other classes can have stronger recall while overall accuracy still looks high.
+
+Undefined precision/F1 cases display zero because zero_division=0 is used.
+A zero does not always mean the same type of failure; inspect support and
+the confusion matrix as well.
+
+Important matrix line:
+  axis.imshow(matrix, cmap='Blues')
+
+How to read the picture:
+  Pick a row to choose the REAL sign.
+  Pick a column to choose the PREDICTED sign.
+  The number at their intersection counts those decisions.
+  Diagonal: correct label.
+  Off-diagonal: a particular confusion.
+
+Example:
+A value of 3 at row call, column help means three real call clips were
+predicted as help. It does not mean three help clips were predicted as call.
+
+Each panel's color shading is automatically scaled to its own matrix unless
+specified otherwise. Compare printed counts rather than assuming the same
+shade has the same count across languages/panels.
+
+Why this block is necessary:
+A single accuracy value cannot reveal which signs are difficult or which
+mistakes repeat. Error patterns identify useful follow-up investigations.
+They do not prove the cause of an error without checking the clips.
+
+Cell 11 automatically finds the candidate's lowest-recall class and explains
+the tables/matrices. The ISL snapshot identifies call. For Nepali, both KA
+and LA have zero recall; the simple min() selection displays the first tied
+class, KA. It is not proof that KA is uniquely the hardest class.
+
+Each Nepali class has only one test clip. A recall of 0 or 1 is the outcome
+of one example, not a stable estimate of performance on that sign.
+
+
+12. CELLS 12 AND 13: GATE SETTINGS AND EXPLANATION
+-----------------------------------------------
+Cell 12 displays the threshold and group log for each outer fold.
+
+Columns:
+  fold: which evaluation partition this is.
+  threshold: the cutoff on the four-frame classifier's score gap.
+  gate_validation_clips: number of examples used to select the threshold.
+  gate_validation_reject_rate: fraction rescued on those validation examples.
+  train_groups: final outer-training groups.
+  test_groups: held-out groups for that fold.
+
+Important selection:
+  ['fold', 'threshold', 'gate_validation_clips',
+   'gate_validation_reject_rate', 'train_groups', 'test_groups']
+This shows the settings relevant to the gate, not every stored field.
+
+Why show the groups?
+It makes separation inspectable. Training and test group lists must not overlap.
+The Python helper asserts this condition before evaluation.
+
+Why can thresholds be large numbers such as 948 or 1042?
+These are raw differences between model scores, not values between zero and
+one. Their scale depends on learned weights, scaling, and fitting behavior.
+They must not be described as 948% confidence.
+
+Most important gate rule:
+  gap < threshold -> rescue
+  gap >= threshold -> keep coarse prediction
+
+The threshold is selected to minimize validation rescue fraction while
+keeping macro F1 within an absolute 0.02 of validation Uniform 8 macro F1.
+That rule is not a test guarantee and not a probability-calibration method.
+
+Current settings:
+  ISL: two positive thresholds and three zero thresholds.
+  Nepali: zero threshold.
+
+A zero threshold effectively disables rescue for ordinary nonnegative gaps.
+The gate can therefore accept a confidently wrong prediction. Low rescue
+rate alone is not a sign that uncertainty is handled well.
+
+Validation versus test rescue rate:
+gate_validation_reject_rate is measured using temporary inner-training models.
+rescue_rate in the speed table is measured using final refitted models on test.
+Their score distributions can differ. The code reuses the threshold without
+calibrating the refitted score scale. This is an acknowledged weakness.
+
+Cell 13 is the plain-English explanation of this rule directly below the log.
+It is especially useful when a reviewer asks, 'What does your confidence mean?'
+The honest answer: score separation used as a heuristic, not calibrated confidence.
+
+
+13. CELL 14: THE TAKEAWAY
+-------------------------
+This cell combines the actual accuracy, feature-work reduction, and speed
+ratios into a short summary for each language.
+
+Important calculation:
+  1 - adaptive['mean_frames'] / uniform['mean_frames']
+This compares mean IMAGE-descriptor counts, not total decoded frames.
+For ISL: 1 - 4.1068/8 is about 48.7% fewer frame descriptors.
+
+Other important calculations:
+  uniform['mean_ms'] / adaptive['mean_ms']
+  dense['mean_ms'] / adaptive['mean_ms']
+These have different reference methods. Always name the denominator/reference.
+
+Current ISL takeaway:
+  Adaptive accuracy: about 91.3%.
+  Uniform accuracy: about 91.7%.
+  Mean descriptor-frame reduction: about 49%.
+  Measured total speed ratio against uniform: about 1.01x.
+  Measured total speed ratio against all frames: about 3.22x.
+
+How to say it correctly:
+  We reduced descriptor work substantially with a small observed accuracy
+  trade-off. Total time is nearly the same as optimized uniform sampling.
+
+How NOT to say it:
+  We doubled speed because we halved the frames.
+  We beat all established sign-recognition models.
+  We proved our gate is calibrated or our algorithm is globally novel.
+
+Current Nepali takeaway:
+  Accuracy remains 60% for each method, from just five test clips.
+  The candidate uses four frame descriptors and takes about 21.3 ms.
+  Uniform takes about 22.7 ms in this run.
+  Neither result establishes broad language-level generalization.
+
+This cell is based on saved report values. Its prose is not a statistical test.
+
+
+14. CELLS 15 AND 16: LIMITATIONS AND RESEARCH
+------------------------------------------
+Cell 15 lists measured quantities and unmeasured claims.
+
+Most important reminders:
+  The cascade stores two classifiers.
+  Traversal continues through the whole video.
+  All-frame pooling and sampled ordered descriptors differ.
+  Whole-image features can exploit background shortcuts.
+  ISL group IDs are not verified signer IDs.
+  Nepali has only five test clips.
+  No probability-based log loss, exact FLOPs, energy, peak RAM, or statistical
+  significance tests are reported.
+
+The saved model_kib and gray_buffer_kib are storage proxies. They are not
+proof that the method uses less total process memory or less energy.
+
+Cell 16 maps the building blocks to research:
+
+  Dalal and Triggs, CVPR 2005, HOG:
+    edge-direction features as an established technique.
+    https://ieeexplore.ieee.org/document/1467360
+    Our cell-normalized descriptor is simplified, not the exact original HOG.
+
+  Wang et al., ECCV 2016, Temporal Segment Networks:
+    sparse temporal sampling as an established idea.
+    https://arxiv.org/abs/1608.00859
+    Our linear classifier is not the TSN neural architecture.
+
+  Teerapittayanon, McDanel and Kung, BranchyNet:
+    conditional extra computation/early exits as established ideas.
+    https://arxiv.org/abs/1709.01686
+    Our frame-budget cascade is not a reproduction of BranchyNet.
+
+  Sunuwar, Borah and Kharga, Data in Brief 2024, NSL23:
+    attribution for the Nepali videos.
+    https://doi.org/10.1016/j.dib.2024.109986
+    The linked source card states CC BY 4.0. Preserve the local README and manifest.
+
+Additional closely related work discussed during the project:
+  CRAM-SLR, Sasidharan et al., 2025:
+    https://doi.org/10.47852/bonviewJCCE52025288
+    Uses HOG changes to select critical motion frames before a neural recognizer.
+    Our current candidate uses predicted score separation to request more features.
+    This is direct related work, although it is not presently a row in Cell 16.
+
+Why references are necessary:
+They identify which ideas already exist and prevent presenting familiar
+building blocks as new inventions. We must distinguish 'inspired by an idea'
+from 'implemented and reproduced the paper's full model.'
+
+
+15. DESIGN CHOICES, PROS, CONS, AND ALTERNATIVES
+---------------------------------------------
+Grayscale 48 by 48 images:
+  Why: keep processing cheap and uniform.
+  Pro: fewer pixels and channels.
+  Con: loss of color and fine finger details.
+
+HOG-style edge features:
+  Why: understandable, fast, and no pretrained neural weights needed.
+  Pro: a strong simple local baseline.
+  Con: does not explicitly localize hands, model language, or remove backgrounds.
+
+Linear SGD hinge classifier:
+  Why: fast fitting/inference with fixed-size features.
+  Pro: small and reproducible.
+  Con: cannot learn rich nonlinear spatiotemporal representations by itself.
+
+Eight spaced observations:
+  Why: cover the whole clip with a small fixed budget.
+  Pro: simple and consistent.
+  Con: important short transitions might fall between selected images.
+
+Nested four-frame budget:
+  Why: reuse its descriptors if expanding to eight.
+  Pro: reduces extra image-descriptor work.
+  Con: interpolation cannot replace the missing information.
+
+Score-gap gate:
+  Why: use the recognizer's decision to request more evidence.
+  Pro: cheap and easy to implement.
+  Con: raw margins are uncalibrated and change after refitting; some folds never rescue.
+
+Compared with motion-event methods:
+  Prediction-guided expansion is a different selection trigger.
+  But motion scoring can target informative transitions our fixed positions miss.
+  A fair comparison should include the cost of computing motion scores.
+
+Compared with landmark/GRU or neural fusion methods:
+  This pipeline has fewer dependencies and avoids detector/neural feature cost.
+  However, it lacks explicit hand geometry and learned temporal/image representations.
+  A tiny local experiment cannot establish that it is universally better.
+
+Most important next experiment:
+Compare fixed four frames with adaptive four-to-eight. If they perform the
+same, the gate has not yet demonstrated its value beyond a smaller fixed budget.
+Also compare a CRAM-style selector with the same classifier, improve gate
+calibration, and evaluate on a larger untouched set with verified signers.
+
+
+16. TROUBLESHOOTING AND A SHORT REVIEW SCRIPT
+-------------------------------------------
+NameError for DATA, REPORTS, ROOT, np, or speed_poc:
+  Setup has not run in the current kernel. Run Cell 2 first.
+
+ModuleNotFoundError:
+  The kernel lacks a dependency or is not the intended environment.
+  Check the Python executable printed in Cell 2. A terminal environment can
+  differ from the notebook kernel.
+
+Missing Cropped_Data, manifest, or metrics.json:
+  Confirm the working directory is the project root and the datasets exist.
+  RERUN=False requires previously saved full-run metrics.
+  Do not substitute smoke-test metrics and present them as full results.
+
+Missing fold pickle when running the animation:
+  The matching saved benchmark models are required. Keep them consistent
+  with the metrics and current dataset, or perform a full legitimate rerun.
+
+VIS_CLIP out of range:
+  Choose an index within visual_test_records. Nepali has only five eligible
+  test clips in the current subset.
+
+Animation controls do not render:
+  HTML/JavaScript output may be restricted by the notebook viewer or trust
+  settings. A successfully generated figure is not a measured inference run.
+  Static overlay images are also available under results/speed_poc.
+
+Old visible outputs after changing code or flags:
+  Re-execute the relevant cells. Saved output does not update itself.
+  Restarting the kernel clears variables but does not necessarily erase
+  saved output, so run setup again before dependent cells.
+
+Suggested review flow:
+  1. Cell 1: explain the question and three methods.
+  2. Cell 3: demonstrate which frame features are used.
+  3. Cell 4: state the test protocols and small Nepali sample.
+  4. Cells 5/6: show the accuracy trade-off.
+  5. Cells 8/9: show work reduction and honest total latency.
+  6. Cells 10/11: show difficult classes rather than hiding errors.
+  7. Cells 12/13: explain how the gate was selected and its weakness.
+  8. Cells 14-16: conclude with limitations and research credit.
+
+One-minute project overview:
+  We compare three CPU-only pipelines for classifying isolated sign clips.
+  All-frame processing is thorough but costly. Uniform eight-frame sampling
+  is a fast baseline. Our candidate describes four first and asks for more
+  if a classifier score gap is small, reusing computed features. On local
+  ISL clips it uses about half the frame descriptors with two fewer correct
+  predictions than uniform eight. Total latency is almost the same because
+  video processing dominates. Nepali is only a small five-test-clip demo.
+  This is a candidate engineering contribution, not a proven novel translator.
+
+Final summary:
+  The notebook turns the helper's experiment into understandable evidence.
+  Read quality and cost together, name the comparison baseline, separate
+  descriptor work from video traversal, and acknowledge unmeasured claims.
+  The supported conclusion is lower feature work with a small observed
+  accuracy trade-off, not a guaranteed improvement in every kind of cost.

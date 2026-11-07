@@ -1,0 +1,898 @@
+SPEED_POC.PY EXPLAINED FROM THE BEGINNING
+======================================
+Guide checked against the current implementation and saved results on 7 October 2026.
+
+This guide explains speed_poc.py, the Python helper used by sign_speed_poc.ipynb.
+You do not need to know machine learning before reading it.
+The helper now includes function-level docstrings for quick review at the
+implementation site. Run the focused, dataset-independent contract tests with
+`python -m unittest discover -s tests -v` in an environment with the
+requirements from requirements-speed.txt installed.
+
+CONTENTS
+1. What this file does and does not do
+2. The complete code flow
+3. Basic vocabulary: frames, pixels, features, cells, and bins
+4. How the datasets are indexed
+5. How video loading works
+6. How HOG turns images into numbers
+7. How a complete clip becomes one fixed-size vector
+8. How the three methods differ
+9. The classifier, scaling, training, and hinge loss
+10. How the adaptive gate works
+11. How the experiment avoids training on test examples
+12. How timing and outputs are collected
+13. Every reported metric, explained
+14. What the actual results mean
+15. Pros, cons, research context, and conclusion
+16. How to run it and what to remember
+
+
+1. WHAT THIS FILE DOES AND DOES NOT DO
+------------------------------------
+The question is:
+Can we classify a short sign video while describing fewer of its images?
+
+Input: a prerecorded video containing one labeled sign.
+Output: one predicted label, such as doctor, help, or a Nepali alphabet gloss.
+
+The file compares three processing methods:
+  All frames
+  Uniform 8
+  Adaptive 4 to 8
+
+The current implementation uses small grayscale images, gradient-histogram
+features, and linear classifiers. It does NOT use MediaPipe hand landmarks,
+GRU, CNN, Transformer, or Neural CDE. Those belong to earlier experiments in
+the project, not to the current speed proof of concept.
+
+It does not translate continuous signing into sentences. Indian and Nepali
+sign languages are different languages. Their models and results are kept
+separate. The same program can run both experiments, but there is no shared
+multilingual recognition model or cross-language transfer experiment here.
+
+There are two main roles:
+  speed_poc.py: do the processing, training, measurement, and saving.
+  sign_speed_poc.ipynb: load or run those results and explain them visually.
+
+
+2. THE COMPLETE CODE FLOW
+-------------------------
+The full experiment flows like this:
+
+run(root)
+  -> datasets(root)
+     -> find ISL videos and read the Nepali manifest
+  -> evaluate(records, language, output_dir)
+     -> decode each clip
+     -> ClipFeatures.feature() builds dense, eight-frame, and four-frame vectors
+     -> splits_for() creates training, validation, and test groups
+     -> train two temporary models on inner training examples
+     -> decision() gets validation predictions and score gaps
+     -> choose_gate() selects a rescue threshold using validation labels
+     -> train final dense, eight-frame, and four-frame models on outer training
+     -> measure each test method independently from video open to prediction
+     -> calculate accuracy, error, time, work, and storage metrics
+     -> save metrics, timings, predictions, and fold models
+  -> return separate ISL and Nepali reports
+
+table() makes display tables from a report.
+explanation() creates plain-English descriptions from the measured numbers.
+smoke_test() checks important assumptions before a real experiment.
+
+Important distinction:
+Running the Python file directly runs smoke_test(), not the full benchmark.
+The full benchmark runs when run() is called, for example by the notebook
+when RERUN is True.
+
+Most important line for the candidate method:
+  rescued = bool(gap[0] < threshold)
+
+This decides whether the code computes extra descriptors and uses the
+eight-frame classifier. The decoder has already traversed the clip by then.
+
+
+3. BASIC VOCABULARY: FRAMES, PIXELS, FEATURES, CELLS, AND BINS
+----------------------------------------------------------
+Frame:
+One still image from a video. A clip with 80 frames contains 80 images.
+Frame indices start at zero: the first is 0 and the last is 79.
+
+Pixel:
+One small position in an image. A 48 by 48 image has 2,304 pixels.
+In grayscale, each pixel describes brightness rather than separate colors.
+
+Feature:
+A number that describes some aspect of an input. A model needs numbers, not
+the human meaning of an image. A list of features is called a feature vector.
+
+Descriptor:
+A collection of features summarizing an image. Here, one image descriptor
+contains 324 numbers describing local edge directions.
+
+Cell:
+A small spatial region in the image. We divide the 48 by 48 image into
+6 by 6 cells. Each cell is 8 by 8 pixels. There are 36 cells.
+
+Histogram:
+A list of totals for categories. For example, a histogram can count how many
+people fall into each age range. Here it totals edge strength by direction.
+
+Bin:
+One category or interval in a histogram. Our direction histogram has nine bins:
+  bin 0: 0 to below 20 degrees
+  bin 1: 20 to below 40 degrees
+  ...
+  bin 8: 160 to below 180 degrees
+
+A gradient with angle 47 degrees contributes to bin 2. Its contribution is
+weighted by edge strength: a strong edge contributes more than a weak edge.
+Bins are not sign labels, and they are not frames.
+
+There is another, different use of the word bin:
+The all-frame method groups its descriptor sequence into eight time bins.
+For an 80-frame video, these bins contain ten consecutive descriptors each.
+It averages the descriptors in each time bin. Time bins and direction bins
+are separate concepts.
+
+Class or label:
+The category the classifier predicts, such as doctor. ISL has eight classes;
+the local Nepali subset has five classes.
+
+Sample:
+One entire video clip, not one frame, is one classification example here.
+
+
+4. HOW THE DATASETS ARE INDEXED: datasets(root)
+---------------------------------------------
+Purpose:
+Create a list saying where each clip is, what its label is, and which group
+it belongs to. This function does not train a model or read video pixels.
+
+ISL:
+The code scans Cropped_Data/*_Cropped/*.avi.
+The folder doctor_Cropped gives the label doctor.
+For a filename such as accident_Crop_001_01.avi, the regular expression
+extracts 001 as the group. A regular expression is a pattern for matching text.
+
+Important line:
+  match = re.search(r"_Crop_(\d+)_\d+$", path.stem)
+
+The first numeric field becomes the group. We have NOT verified that this
+field represents a signer. Therefore, this is filename-group evaluation,
+not a proven signer-independent ISL evaluation.
+
+Nepali:
+The code reads External_Data_NS23/manifest.csv using csv.DictReader.
+It obtains local_file, gloss, volunteer, and split from the manifest.
+Using this metadata is safer than guessing the official split from labels.
+
+Example record:
+  {
+    "path": Path(".../accident_Crop_001_01.avi"),
+    "label": "accident",
+    "group": "001",
+    "split": "cv"
+  }
+
+Return format:
+  {"ISL": [record, record, ...], "Nepali": [record, record, ...]}
+
+Checks:
+The function raises an error if an ISL filename has no identifiable group,
+if a Nepali manifest filename does not resolve to exactly one local file,
+or if either dataset is empty. Failing early avoids silently reporting
+results for the wrong dataset.
+
+
+5. HOW VIDEO LOADING WORKS: decode(path, sparse=False)
+---------------------------------------------------
+OpenCV opens the video. Each retained image is converted to grayscale and
+resized to 48 by 48 pixels. Finally, the capture is released, even if an
+exception occurs. This avoids leaving a video resource open.
+
+Why grayscale?
+It removes color channels and keeps the edge-oriented features lightweight.
+Disadvantage: potentially useful color and appearance information is lost.
+
+Why 48 by 48?
+Small images make feature extraction cheap. It is a speed-oriented engineering
+choice, not a mathematically optimal resolution. Fine finger details can disappear.
+
+Full-read mode:
+  capture.read()
+This returns each video image. Every image is converted and resized.
+
+Sparse mode:
+The code first reads the reported frame count and selects eight positions.
+  capture.grab()
+advances through the compressed video. At selected positions:
+  capture.retrieve()
+returns an image for grayscale conversion and resizing.
+
+Important line:
+  if index in selected:
+
+Only selected positions get a usable image in sparse mode. Other positions
+are stored as None. The returned list still has one entry per traversed frame,
+so original zero-based frame indices remain valid.
+
+Example sparse return:
+  [image_for_frame_0, None, None, ..., image_for_frame_79]
+
+Important caveat:
+grab() is NOT a promise that the codec avoids decoding an unselected frame.
+Inter-frame video compression can require preceding frames. The measured
+saving is reduced retrieval/conversion/resizing and later descriptor work.
+
+Both Uniform 8 and Adaptive 4 to 8 retrieve eight images. The adaptive
+method initially describes only four of them. It does not initially retrieve
+only four images, and it does not finish reading the video early.
+
+Fallback:
+If actual traversal length differs from reported frame-count metadata, the
+function retries with a full read. This is slower but keeps frame selection
+correct. If no valid frame exists, it raises an error.
+
+
+6. HOW HOG TURNS IMAGES INTO NUMBERS: hog(gray)
+--------------------------------------------
+HOG means Histogram of Oriented Gradients.
+In simple language: summarize which way image brightness changes locally.
+These changes often follow outlines of hands, arms, clothing, or background.
+HOG does not know which pixels are hands or what a gesture means.
+
+Block A: Convert to floating point.
+  image = gray.astype(np.float32)
+Brightness differences and later normalization need arithmetic that can
+represent negative values and fractions.
+
+Block B: Compute gradients.
+  horizontal = cv2.Sobel(image, cv2.CV_32F, 1, 0, ksize=1)
+  vertical = cv2.Sobel(image, cv2.CV_32F, 0, 1, ksize=1)
+A gradient describes change in brightness across neighboring pixels.
+The two filters detect change along the horizontal and vertical directions.
+
+Block C: Compute strength and angle.
+  magnitude = cv2.magnitude(horizontal, vertical)
+  angle = np.mod(np.degrees(np.arctan2(vertical, horizontal)), 180)
+Magnitude is how strong the change is. Angle is its direction.
+Angles are folded into 0 to below 180 degrees. Opposite gradient directions
+are treated as the same orientation. This is called unsigned orientation.
+
+Block D: Assign direction bins.
+  bins = np.minimum((angle / 20).astype(int), 8)
+Dividing by 20 identifies one of nine direction ranges. The minimum guards
+against an out-of-range bin. Each pixel contributes to a single bin here.
+
+Block E: Identify the spatial cell and accumulate totals.
+  addresses = (row_cell * 6 + column_cell) * 9 + bins
+This maps a pixel's cell and direction to one position in a 324-entry list.
+np.bincount() adds gradient magnitudes at those positions efficiently.
+
+Block F: Normalize each cell.
+  histograms /= np.linalg.norm(histograms, axis=1, keepdims=True) + 1e-6
+This divides each cell histogram by its length, reducing sensitivity to
+overall edge strength. The tiny 1e-6 prevents division by zero for flat cells.
+
+Output size:
+  6 * 6 cells * 9 direction bins = 324 features per image.
+
+Why use this approach?
+It is inexpensive, easy to explain, CPU-friendly, and needs no downloaded
+neural-network weights. It provides a strong simple baseline for local clips.
+
+Limits:
+This is a simplified cell-normalized HOG-style descriptor. Original
+Dalal-Triggs HOG uses more elaborate block normalization and other details.
+We should not claim an exact implementation of the original paper.
+Whole-image features can also encode backgrounds, not just signing.
+
+
+7. HOW A CLIP BECOMES ONE VECTOR: ClipFeatures
+--------------------------------------------
+The class stores:
+  frames: the small images
+  descriptors: a dictionary mapping frame index to its computed descriptor
+  transitions: a dictionary mapping a pair of indices to its difference descriptor
+
+Most important reuse line:
+  if int(index) not in self.descriptors:
+
+The same image descriptor is computed once per ClipFeatures instance.
+If the adaptive method expands from four to eight frames, the four existing
+descriptors are reused. This cache does not persist across clips or methods.
+
+Transitions:
+For each neighboring pair of SELECTED frames, the code calculates:
+  cv2.absdiff(self.frames[left], self.frames[right])
+Then it computes HOG on the difference image and averages those descriptors.
+
+This describes visible change between sampled observations. It is not optical
+flow, landmark displacement, or a measurement of real movement speed.
+The intervals between observations need not be one video frame apart.
+
+More than eight selected frames:
+Split descriptors into eight consecutive time bins and average within each bin.
+This retains a coarse ordering while reducing a variable-length sequence.
+
+Exactly eight selected frames:
+Keep the eight descriptors directly and in order.
+
+Fewer than eight selected frames:
+Use linear interpolation between descriptor rows to produce eight positions.
+For a position halfway between descriptors A and B, use their average.
+This creates intermediate numbers, NOT new video frames or new observations.
+It keeps the classifier input size fixed, but can blur important transitions.
+For one frame, the descriptor is effectively repeated at all eight positions.
+
+Final output:
+  Eight frame-descriptor positions: 8 * 324 = 2,592 numbers
+  Average transition descriptor:              324 numbers
+  Total:                                   2,916 numbers
+
+The last important line:
+  return np.concatenate((descriptors.ravel(), summary)).astype(np.float32)
+It flattens the frame descriptors, appends the transition summary, and returns
+one compact vector. A training matrix has shape (number_of_clips, 2916).
+
+operations property:
+  len(self.descriptors) + len(self.transitions)
+This counts actual HOG calls, including difference-image descriptors.
+Eight unique selected frames normally need 8 + 7 = 15 HOG calls.
+Four unique selected frames normally need 4 + 3 = 7 HOG calls.
+A rescued clip can exceed 15 calls because some coarse transitions differ
+from the adjacent transitions in the eight-frame sequence.
+
+
+8. HOW THE THREE METHODS DIFFER: frame_indices(count)
+----------------------------------------------------
+Important lines:
+  full = np.linspace(0, count - 1, min(8, count), dtype=int)
+  small = full[np.linspace(0, len(full) - 1, min(4, len(full)), dtype=int)]
+
+np.linspace() spaces positions across an interval. Integer conversion means
+the spacing can differ slightly. Short clips use fewer unique frames.
+
+Actual 80-frame example:
+  Eight-frame positions: [0, 11, 22, 33, 45, 56, 67, 79]
+  Four-frame positions: [0, 22, 45, 79]
+
+The four-frame set is nested inside the eight-frame set. This makes reuse
+possible: expansion requests only four additional frame descriptors.
+
+All frames:
+Uses every frame descriptor and every adjacent-frame difference descriptor.
+Its frame descriptors are averaged into eight time bins.
+
+Uniform 8:
+Uses eight spaced observations and a classifier trained on eight-frame features.
+It is deterministic and has no adaptive decision.
+
+Adaptive 4 to 8:
+Uses a four-frame classifier first. If its score gap is below the threshold,
+it builds the eight-frame feature vector and calls the eight-frame classifier.
+The second classifier replaces the first prediction; their scores are not fused.
+
+Comparison caveat:
+The dense method averages observations while sampled methods retain or
+interpolate selected descriptors. We compare practical pipelines, not a
+perfectly controlled frame-count-only change.
+
+
+9. CLASSIFIER, SCALING, TRAINING, AND HINGE LOSS: train()
+-----------------------------------------------------
+The classifier is:
+  SGDClassifier(loss="hinge", alpha=1e-4, class_weight="balanced",
+                max_iter=3000, tol=1e-3, random_state=42)
+
+SGD means Stochastic Gradient Descent. It is an optimization procedure, not
+a separate kind of video feature. The model is a LINEAR classifier with
+hinge loss, often described as an SVM-style linear classifier trained by SGD.
+It is not a kernel SVM fitted using sklearn.svm.SVC.
+
+What is linear classification?
+For each class, the model combines features using learned weights and an
+offset: score = weighted sum of features + bias.
+Imagine a boundary separating examples in feature space. It is a straight
+line in two dimensions, a plane in three, and a hyperplane in many dimensions.
+There are 2,916 input dimensions, even though we cannot visualize them all.
+
+Multiple classes:
+SGDClassifier uses one-versus-rest classifiers for multiclass learning.
+Each class is learned against the other classes. At prediction, the class
+with the largest decision score wins. Class scores are not probabilities.
+
+Why StandardScaler comes first:
+  make_pipeline(StandardScaler(), SGDClassifier(...))
+It learns the mean and spread of each feature using TRAINING examples.
+It then centers and scales features before classification. The trained
+pipeline applies the same transformation to validation and test examples.
+It does not fit fresh scaling statistics on test data.
+
+Important training line:
+  model.fit(features, labels)
+This fits both scaler and classifier to the supplied training subset.
+Merely creating a feature matrix does not learn a classifier.
+
+What is a loss?
+A loss gives training an error signal: how undesirable are the current
+predictions? The optimizer changes weights to reduce that objective.
+Loss is used to learn parameters. Accuracy and F1 evaluate predictions.
+
+What is hinge loss?
+For one binary one-versus-rest decision, let y be +1 for the target class
+and -1 for the other classes. Let score be the model's decision score.
+The basic loss is:
+  max(0, 1 - y * score)
+
+For a positive example:
+  score = 2.0  -> loss = 0: correct with a sufficiently large margin
+  score = 0.2  -> loss = 0.8: correct side, but too close to the boundary
+  score = -0.5 -> loss = 1.5: wrong side and penalized more
+
+This encourages correct decisions with a safety margin, not just correct
+signs of scores. The training objective also includes regularization.
+
+Why hinge loss?
+It is a natural choice for a fast linear margin-based baseline. It also
+provides decision scores useful for our experimental gate. Logistic loss
+would be an alternative if probability estimation were central, but even
+logistic probabilities would need validation/calibration for a reliable gate.
+
+Parameter meanings:
+  alpha=1e-4: controls regularization strength. The default penalty is L2,
+    which discourages very large weights. With the default optimal learning
+    rate, alpha also influences the optimization schedule.
+  class_weight="balanced": gives rarer training classes more weight.
+    It is based on training class frequencies, not test labels.
+  max_iter=3000: an upper limit on passes through training data, not a promise
+    that training always performs 3,000 passes.
+  tol=1e-3: training can stop when improvement is small under the estimator's
+    convergence rule. This is not our earlier neural validation early stopping.
+  random_state=42: fixes the training randomness for reproducibility.
+
+Why not a deep model in this proof of concept?
+Linear models train quickly, are small, and work well with these local features.
+Deep models can learn richer spatial/temporal information, but add training,
+data, dependency, and often inference costs. Our goal here is a simple speed
+trade-off, not maximum possible accuracy on a large standardized benchmark.
+
+
+10. HOW THE ADAPTIVE GATE WORKS: decision() AND choose_gate()
+---------------------------------------------------------
+decision() obtains scores from the COMPLETE fitted pipeline:
+  scores = model.decision_function(np.atleast_2d(features))
+np.atleast_2d() lets a single vector be passed as one row.
+The scores are sorted to find the largest and second-largest values.
+
+Important line:
+  gap = ordered[:, -1] - ordered[:, -2]
+
+Example:
+  doctor score = 8.0, help score = 7.7 -> gap 0.3
+  doctor score = 8.0, help score = 1.0 -> gap 7.0
+The second example has greater separation. Neither gap means a particular
+percentage of confidence. A wrong prediction can still have a large gap.
+
+The binary case is converted into two scores, negative and positive, so the
+same prediction/gap logic works for two classes too.
+
+choose_gate() runs on validation examples, not final test examples.
+It tries threshold values derived from validation score-gap quantiles,
+including zero and a value just above the largest validation gap.
+A quantile is a position in the sorted values: the median is the 50% quantile.
+
+For each candidate threshold:
+  rescue examples whose gap is strictly below threshold
+  keep their four-frame prediction if they are not rescued
+  use their eight-frame prediction if rescued
+  calculate the resulting validation macro F1
+
+Eligibility rule:
+  score >= full_f1 - allowed_drop
+The allowed drop is 0.02 in macro F1. It is an ABSOLUTE score difference,
+not 2% of the baseline and not a guaranteed 2% accuracy limit.
+
+Most important selection line:
+  return min(candidates)[2]
+Each candidate is stored as (rescue_fraction, -macro_F1, threshold).
+Python compares tuples from left to right. Therefore the gate first seeks
+the lowest rescue fraction, then the highest F1, then the lower threshold.
+
+This minimizes requests for extra work, not measured milliseconds directly.
+Some rescue cases cost more because they need extra transitions and a second
+classifier call. The minimum-rescue choice is only a proxy for cheaper work.
+
+Threshold zero means no rescue because score gaps are nonnegative.
+Some current folds choose zero. On those folds, the adaptive pipeline acts
+as a fixed four-frame classifier at inference.
+
+Important weakness:
+The gate is selected using temporary inner-training models. Final models
+are then refitted on a larger training set. Their score scale can change.
+The numerical threshold is reused without probability calibration, so the
+validation rescue rate need not match the final test rescue rate.
+
+
+11. HOW WE SEPARATE TRAINING, VALIDATION, AND TEST: splits_for()
+------------------------------------------------------------
+Training examples teach the model its weights.
+Validation examples choose the gate threshold.
+Test examples assess the chosen system on unseen groups.
+
+Data leakage means information from the test set improperly influences
+training or selection. It can make a method look better than it really is.
+
+ISL:
+  StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42)
+creates five outer folds. Each clip is tested once, by a model trained on
+the other outer folds. This produces out-of-fold predictions, or OOF.
+
+Stratified means it tries to maintain class balance.
+Grouped means related clips with the same group stay together.
+These goals are constrained by the available groups, so perfect class
+proportions in every fold are not guaranteed.
+
+Inside each outer training set, the code takes ONE inner grouped holdout
+to choose the gate. It does not average over all inner folds.
+
+Nepali:
+The manifest's ten S2/S3 clips are training examples.
+The five S1 clips are the held-out test set.
+For gate selection, one training signer group is used for fitting temporary
+models and the other for validation. Final models use both S2 and S3.
+
+Important checks:
+  assert not set(groups[train_indices]) & set(groups[test_indices])
+  assert not set(groups[fit_indices]) & set(groups[validation_indices])
+The & operator finds shared group IDs. An empty intersection is required.
+
+The code also checks that fitting/training subsets contain every class.
+Otherwise a model could be asked to predict a class it never learned.
+
+Label-free features are precomputed for all clips before splitting. This
+alone is not training leakage: HOG has no learned global statistics here.
+The fitted StandardScaler and classifier only see their permitted training
+rows. Those precomputed features are NOT reused for inference timing.
+
+
+12. HOW TIMING AND OUTPUTS ARE COLLECTED: evaluate() AND run()
+-----------------------------------------------------------
+evaluate() first prepares feature matrices. This makes fitting the small
+classifiers convenient. It prints progress, such as:
+  ISL: training features 100/412
+
+Within each fold, it fits temporary gate models, selects a threshold, and
+fits the three final classifier variants: dense, full, and coarse.
+The candidate uses coarse plus full; it has no separately named fourth model.
+
+For each test clip and repeat, method order is randomized using a fixed seed.
+This reduces fixed-order effects, but does not eliminate timing noise.
+
+The measured path is:
+  start clock -> open and traverse video -> retrieve/resize images
+  -> compute selected features -> predict -> stop clock
+
+time.perf_counter() is a high-resolution elapsed-time clock.
+The three measured components are decode, feature/policy, and model time.
+Pipeline prediction time includes applying the already fitted scaler.
+
+Every method gets a fresh ClipFeatures instance. A previous method's cached
+features cannot make the next method falsely appear faster.
+Operating-system file caches may still be warm. This is not a cold-disk benchmark.
+
+The notebook's saved experiment uses two repeats. evaluate() and run() default
+to three if called without an explicit repeats argument.
+Repeated timings are not extra accuracy samples: 412 test clips remain 412
+test clips even if each prediction is timed twice.
+The code checks repeated predictions agree with the first prediction.
+
+run() limits supported numerical-library thread pools to one thread using
+threadpool_limits(limits=1). This does not promise every OpenCV codec or
+operating-system component uses exactly one thread.
+
+Saved files, separately under results/speed_poc/isl and /nepali:
+
+  metrics.json
+    Structured report: dataset details, fold settings, quality/time/work
+    metrics, per-class reports, confusion matrices, and limitations.
+
+  timings.csv
+    One row per tested clip, method, and timing repeat.
+    Fields: clip, repeat, total_ms, decode_ms, model_ms, feature_policy_ms, method.
+    clip is an index into the language's record list, not a sign class.
+
+  predictions.csv
+    One row per tested clip with path, true label, group, and each method's
+    predicted label. Nepali has five such rows, not fifteen.
+
+  fold_1.pkl, fold_2.pkl, ...
+    Fitted pipelines, threshold, and classes for each evaluation fold.
+    ISL has five fold files; Nepali has one. These are evaluation models,
+    not a final model trained on all ISL clips for deployment.
+    Only load pickle files you trust: loading a malicious pickle can execute code.
+
+table(report, kind) returns a pandas DataFrame with one row per method.
+explanation(report, kind) returns a text string discussing the numbers.
+
+
+13. EVERY REPORTED METRIC, EXPLAINED
+----------------------------------
+Quality metrics describe correctness. Time/work metrics describe cost.
+Do not treat them as interchangeable.
+
+accuracy:
+  Correct clips / tested clips.
+  376 / 412 = 0.9126, or 91.26%.
+  Necessary for the simplest answer: how often is the predicted sign right?
+  It can hide failures on rare classes.
+
+balanced_accuracy:
+  Calculate recall for each true class, then average equally.
+  Necessary when class counts differ: a large easy class cannot dominate it.
+  For this task, it matches macro recall when the same classes are included.
+
+macro_precision:
+  For each class: true positives / (true positives + false positives).
+  Then average class precisions equally.
+  If doctor is predicted 10 times and 8 are really doctor, its precision is 0.8.
+  It asks: when the model announces a class, how often is it right?
+
+macro_recall:
+  For each class: true positives / (true positives + false negatives).
+  Then average equally.
+  If 10 real doctor clips exist and 7 are found, doctor recall is 0.7.
+  It asks: how many real examples of each sign do we recover?
+
+macro_f1:
+  Each class F1 is 2 * precision * recall / (precision + recall).
+  Average those class F1 values equally.
+  F1 rewards a balance between avoiding false alarms and missing examples.
+  Macro F1 is NOT generally obtained by combining macro precision and macro
+  recall once; it is an average of the separately calculated class F1 scores.
+  We use it for gate validation so every sign class matters.
+
+weighted_f1:
+  Average class F1 using each class's test support as its weight.
+  It reflects the observed class mix, but larger classes get greater influence.
+  Compare it with macro F1 to spot possible class-size effects.
+
+kappa:
+  Cohen's kappa compares observed accuracy with agreement expected from the
+  true-label and predicted-label frequencies.
+  It is (observed agreement - expected agreement) / (1 - expected agreement).
+  Usually 1 means perfect agreement, around 0 means chance-level agreement
+  under that frequency model, and negative values mean worse agreement.
+  It is not simply accuracy minus 1 divided by the number of classes.
+
+mcc:
+  Matthews correlation coefficient summarizes the entire confusion matrix.
+  Its multiclass form is a correlation-style score using correct and
+  incorrect predictions across classes.
+  1 is perfect agreement; around 0 is weak/no useful correlation; negative
+  values indicate systematic disagreement. It is not the same as kappa.
+
+correct and test_clips:
+  Integer counts behind accuracy. These make small-sample claims visible.
+  A displayed 60% from 3/5 is not as convincing as 60% from thousands of clips.
+
+per_class:
+  For each label: precision, recall, f1-score, and support.
+  Support means number of TRUE test examples for that label.
+  When a metric is undefined, zero_division=0 displays zero instead of an error.
+  A zero can therefore reflect no predicted examples, not merely poor precision.
+
+confusion_matrix:
+  Rows are actual labels. Columns are predicted labels.
+  Diagonal entries are correct decisions; off-diagonal entries are mistakes.
+  Read an off-diagonal cell as: real class A was mistaken for class B.
+
+mean_ms:
+  Average total elapsed milliseconds over measured test runs.
+  Lower is faster. It includes video loading, feature work, and prediction.
+
+median_ms:
+  The middle elapsed time after sorting.
+  Useful because a few unusually slow clips affect the mean more strongly.
+
+p95_ms:
+  Estimated 95th-percentile total time: roughly 95% of timings are at or below it.
+  It describes a slow-tail case, not the worst observed time.
+  Nepali has only ten timings per method in the current two-repeat run,
+  so its p95 is especially unstable.
+
+clips_per_second:
+  1,000 / mean_ms.
+  This is serial video-clip throughput, not camera frames per second.
+
+decode_ms:
+  Opening/traversing the clip plus retrieval, grayscale conversion and resizing.
+  This measures more than the codec alone. Large values reveal a bottleneck.
+
+feature_policy_ms:
+  Time after loading and before finishing, excluding model calls.
+  It includes feature extraction, indexing/cache work and adaptive policy overhead.
+  It is not a pure HOG-only timer.
+
+model_ms:
+  Time in decision() calls, including the fitted scaler.
+  Rescue can include two calls. It does not include training.
+
+mean_frames:
+  Average number of unique frame IMAGE descriptors actually computed.
+  It is not the number of compressed frames traversed or retrieved images.
+
+mean_hog_calls:
+  Frame descriptors plus transition descriptors actually computed.
+  This measures useful work more completely than mean_frames alone.
+  It is still an operation count, not measured FLOPs or electrical energy.
+
+mean_decoded:
+  The implementation records len(frames), the count of traversed positions.
+  Despite the name, it is not an instrumented count of codec-internal decodes.
+
+mean_retrieved:
+  Count of non-None stored small images. In normal sparse operation it is eight.
+  For full-read operation it is the whole frame count.
+
+gray_buffer_kib:
+  Stored grayscale pixel bytes: retrieved image count * 48 * 48 / 1,024.
+  KiB means 1,024 bytes. Eight uint8 images account for 18 KiB of pixels.
+  Python lists, arrays, native decoder buffers, temporary images and other
+  memory are excluded. This is NOT process peak RAM.
+
+rescue_rate:
+  Fraction of test clips for which the adaptive method requests eight-frame
+  features and runs the full classifier. Lower means more coarse decisions.
+  A low value can also indicate overconfident errors or a zero threshold.
+
+model_kib:
+  Mean serialized storage for the pipelines needed by a method.
+  The adaptive method stores coarse and full pipelines, roughly doubling
+  this storage. It is not an inference-memory measurement.
+
+training_seconds:
+  Sum of final pipeline fitting times across evaluation folds.
+  Adaptive also includes the temporary gate-fitting/threshold-selection time.
+  Shared training-feature preparation is excluded. This is not complete
+  end-to-end training time or the cost of training one deployment model.
+
+speedup_vs_all:
+  All-frame mean_ms divided by the method's mean_ms.
+  3.22 means measured time was about 3.22 times faster than the dense pipeline.
+  It does not mean 3.22 times faster than Uniform 8.
+
+No probability-based log loss, confidence calibration, energy, exact FLOPs,
+peak RAM, or significance tests are reported by this implementation.
+Two timing repeats cannot by themselves establish a robust latency advantage.
+
+
+14. WHAT THE CURRENT SAVED RESULTS MEAN
+-------------------------------------
+ISL snapshot: 412 test clips, pooled out-of-fold predictions.
+
+Method              Correct   Accuracy   Macro F1   Mean total ms
+All frames          384/412    93.20%     0.9316       144.22
+Uniform 8           378/412    91.75%     0.9164        45.12
+Adaptive 4 to 8     376/412    91.26%     0.9109        44.76
+
+The adaptive method gets two fewer clips correct than Uniform 8.
+That is about a 0.49 percentage-point accuracy drop, not a 49% accuracy drop.
+
+It computes about 4.11 frame descriptors versus eight, a 48.7% reduction.
+It makes about 7.29 HOG calls versus 15, including transitions.
+Feature/policy time is about 0.597 ms versus 0.991 ms, about 40% less.
+Total time differs by only about 0.37 ms, less than 1% of uniform time.
+This tiny overall difference may be measurement noise.
+
+Why the large 3.22x gain against All frames?
+Both sampled methods avoid retrieving/resizing every image, and both avoid
+describing all frames. Most of this gain is shared with Uniform 8; it is not
+solely caused by the novel candidate's gate.
+
+Adaptive rescue occurs for about 2.7% of ISL test clips. Three of five
+validation folds selected a zero threshold. This means much of the measured
+candidate behavior is effectively fixed four-frame prediction. A fixed-four
+ablation is needed to prove the rescue stage adds value.
+
+Nepali snapshot: ten training clips and five held-out S1 test clips.
+
+Method              Correct   Accuracy   Macro F1   Mean total ms
+All frames          3/5       60.0%       0.4667       144.78
+Uniform 8           3/5       60.0%       0.5000        22.73
+Adaptive 4 to 8     3/5       60.0%       0.4667        21.31
+
+Equal accuracy does not mean identical mistakes or identical per-class F1.
+The adaptive Nepali threshold is zero, so no clip is rescued in this run.
+One error changes accuracy by 20 percentage points. Do not claim strong
+generalization from these five test clips.
+
+
+15. PROS, CONS, RESEARCH CONTEXT, AND CONCLUSION
+----------------------------------------------
+Compared with All frames:
+  Pro: much less retrieval/conversion and feature work; much faster measured pipeline.
+  Con: less observed temporal detail; somewhat lower ISL accuracy.
+
+Compared with Uniform 8:
+  Pro: roughly half the descriptor work on these clips; reuse on expansion.
+  Con: two classifiers, larger stored model, extra gate complexity, slightly
+       lower ISL accuracy, and no strong measured total-latency advantage.
+
+Compared with MediaPipe landmarks:
+  Pro: no detector initialization or per-frame landmark inference.
+  Con: no explicit hand localization; background and clothing can influence features.
+
+Compared with GRU/CNN/Transformer recognition:
+  Pro: simple, CPU-friendly fitting and easy interpretation of processing costs.
+  Con: weaker learned spatial/temporal representations; no end-to-end feature learning.
+  This experiment cannot prove all classical models outperform all deep models.
+
+Compared with motion-driven critical-frame selection:
+  Our candidate uses the predicted score gap, not motion extrema, to request
+  more descriptors. It does not search for the most informative motion peak.
+  A motion method can target movement transitions but must pay its scoring cost.
+  We have not implemented a matched CRAM-SLR CFI comparison in this helper.
+
+Research connections:
+  Dalal and Triggs, CVPR 2005: HOG as an established visual descriptor.
+    https://ieeexplore.ieee.org/document/1467360
+  Wang et al., ECCV 2016: sparse temporal sampling in Temporal Segment Networks.
+    https://arxiv.org/abs/1608.00859
+  Teerapittayanon, McDanel and Kung: BranchyNet and conditional inference.
+    https://arxiv.org/abs/1709.01686
+  Sasidharan et al., 2025: CRAM-SLR and HOG-based critical-frame selection.
+    https://doi.org/10.47852/bonviewJCCE52025288
+  Sunuwar, Borah and Kharga, 2024: NSL23 dataset attribution.
+    https://doi.org/10.1016/j.dib.2024.109986
+
+We use ideas related to these works; we do not reproduce their full networks.
+The NSL source card states CC BY 4.0. Preserve its README and manifest attribution.
+Early exits, HOG, and sparse sampling are established. Novelty of the exact
+sign-specific cascade requires a further literature review.
+
+Conclusion:
+The current evidence supports fewer feature computations with a small
+observed ISL accuracy trade-off. It does not establish a large speed gain
+against Uniform 8, statistical significance, or a globally new algorithm.
+
+
+16. HOW TO RUN IT AND WHAT TO REMEMBER
+------------------------------------
+In the verified Python environment, running:
+  python speed_poc.py
+performs smoke checks only. Activate an environment with requirements-speed.txt installed first.
+
+The focused unit tests check sampling boundaries, descriptor dimensions and
+cache reuse, classifier score-gap output, gate selection, group separation,
+and dataset-manifest indexing. They do not train the full benchmark or alter
+the saved result files.
+
+For a complete experiment, call:
+  speed_poc.run(Path.cwd(), repeats=2)
+from the workspace root, or set RERUN=True in notebook Cell 2.
+The standalone minimal dependencies are recorded in requirements-speed.txt.
+
+Do not run the full experiment just to inspect existing tables: saved reports
+can be loaded immediately. A full rerun replaces its saved benchmark artifacts.
+
+One-minute explanation:
+  We convert sign videos into small edge-pattern features. All-frame and
+  eight-frame linear classifiers are baselines. Our candidate first uses four
+  frame descriptors and requests more only if the score gap is small. Reused
+  descriptors reduce repeated work. Grouped validation chooses the gate and
+  held-out groups provide predictions. We measure the whole inference path,
+  not just classifier arithmetic. Fewer descriptors help, but video processing
+  still dominates, and uncertainty from raw score gaps has limitations.
+
+Most important facts to remember:
+  324 features per image; 2,916 features per clip.
+  Nine direction bins are not eight temporal positions.
+  SGD hinge is a linear SVM-style classifier, not a neural model.
+  Score gap is not calibrated confidence.
+  Validation macro F1 chooses the gate; test labels do not.
+  Adaptive saves descriptor work, not necessarily video decoding.
+  The candidate stores two models.
+  Nepali test size is five; ISL group IDs are unverified signers.
+  The full pipeline is a useful proof of concept, not a proven production translator.

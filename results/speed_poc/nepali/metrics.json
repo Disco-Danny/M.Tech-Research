@@ -1,0 +1,370 @@
+{
+  "language": "Nepali",
+  "classes": [
+    "GA",
+    "KA",
+    "LA",
+    "PHA",
+    "RA"
+  ],
+  "clips": 15,
+  "test_clips": 5,
+  "timing_repeats": 2,
+  "folds": [
+    {
+      "fold": 1,
+      "threshold": 0.0,
+      "gate_validation_clips": 5,
+      "gate_validation_reject_rate": 0.0,
+      "train_groups": [
+        "S2",
+        "S3"
+      ],
+      "test_groups": [
+        "S1"
+      ],
+      "calibration_seconds": 0.017949250000015127,
+      "training_seconds": {
+        "dense": 0.0031662499999924876,
+        "full": 0.0026942920000010417,
+        "coarse": 0.0027468750000139153
+      }
+    }
+  ],
+  "results": {
+    "All frames": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.6,
+      "macro_precision": 0.4,
+      "macro_recall": 0.6,
+      "macro_f1": 0.4666666666666666,
+      "weighted_f1": 0.4666666666666666,
+      "kappa": 0.5,
+      "mcc": 0.5590169943749475,
+      "correct": 3,
+      "test_clips": 5,
+      "mean_ms": 146.0137793000058,
+      "median_ms": 145.0269169999956,
+      "p95_ms": 165.56073764999724,
+      "clips_per_second": 6.848668699584576,
+      "decode_ms": 134.38775430000192,
+      "feature_policy_ms": 11.31301230001327,
+      "model_ms": 0.3130126999906224,
+      "mean_frames": 94.8,
+      "mean_hog_calls": 188.6,
+      "mean_decoded": 94.8,
+      "mean_retrieved": 94.8,
+      "gray_buffer_kib": 213.29999999999998,
+      "rescue_rate": 0.0,
+      "model_kib": 126.7890625,
+      "training_seconds": 0.0031662499999924876,
+      "per_class": {
+        "GA": {
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1-score": 0.6666666666666666,
+          "support": 1.0
+        },
+        "KA": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 1.0
+        },
+        "LA": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 1.0
+        },
+        "PHA": {
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1-score": 0.6666666666666666,
+          "support": 1.0
+        },
+        "RA": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 1.0
+        },
+        "accuracy": 0.6,
+        "macro avg": {
+          "precision": 0.4,
+          "recall": 0.6,
+          "f1-score": 0.4666666666666666,
+          "support": 5.0
+        },
+        "weighted avg": {
+          "precision": 0.4,
+          "recall": 0.6,
+          "f1-score": 0.4666666666666666,
+          "support": 5.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      ],
+      "speedup_vs_all": 1.0
+    },
+    "Uniform 8": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.6,
+      "macro_precision": 0.4666666666666666,
+      "macro_recall": 0.6,
+      "macro_f1": 0.5,
+      "weighted_f1": 0.5,
+      "kappa": 0.5,
+      "mcc": 0.5976143046671968,
+      "correct": 3,
+      "test_clips": 5,
+      "mean_ms": 21.347895899998548,
+      "median_ms": 21.66602100001569,
+      "p95_ms": 22.864996199990628,
+      "clips_per_second": 46.84302400032164,
+      "decode_ms": 19.961024899998847,
+      "feature_policy_ms": 1.0742500000105792,
+      "model_ms": 0.31262099998912163,
+      "mean_frames": 8.0,
+      "mean_hog_calls": 15.0,
+      "mean_decoded": 94.8,
+      "mean_retrieved": 8.0,
+      "gray_buffer_kib": 18.0,
+      "rescue_rate": 0.0,
+      "model_kib": 126.7880859375,
+      "training_seconds": 0.0026942920000010417,
+      "per_class": {
+        "GA": {
+          "precision": 0.3333333333333333,
+          "recall": 1.0,
+          "f1-score": 0.5,
+          "support": 1.0
+        },
+        "KA": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 1.0
+        },
+        "LA": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 1.0
+        },
+        "PHA": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 1.0
+        },
+        "RA": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 1.0
+        },
+        "accuracy": 0.6,
+        "macro avg": {
+          "precision": 0.4666666666666666,
+          "recall": 0.6,
+          "f1-score": 0.5,
+          "support": 5.0
+        },
+        "weighted avg": {
+          "precision": 0.4666666666666666,
+          "recall": 0.6,
+          "f1-score": 0.5,
+          "support": 5.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      ],
+      "speedup_vs_all": 6.83972696812784
+    },
+    "Adaptive 4 to 8": {
+      "accuracy": 0.6,
+      "balanced_accuracy": 0.6,
+      "macro_precision": 0.4,
+      "macro_recall": 0.6,
+      "macro_f1": 0.4666666666666666,
+      "weighted_f1": 0.4666666666666666,
+      "kappa": 0.5,
+      "mcc": 0.5590169943749475,
+      "correct": 3,
+      "test_clips": 5,
+      "mean_ms": 21.00781259998712,
+      "median_ms": 21.48554199999353,
+      "p95_ms": 22.55304619998526,
+      "clips_per_second": 47.60133856109385,
+      "decode_ms": 20.04874579998841,
+      "feature_policy_ms": 0.6389877999936289,
+      "model_ms": 0.32007900000508016,
+      "mean_frames": 4.0,
+      "mean_hog_calls": 7.0,
+      "mean_decoded": 94.8,
+      "mean_retrieved": 8.0,
+      "gray_buffer_kib": 18.0,
+      "rescue_rate": 0.0,
+      "model_kib": 252.8828125,
+      "training_seconds": 0.023390417000030084,
+      "per_class": {
+        "GA": {
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1-score": 0.6666666666666666,
+          "support": 1.0
+        },
+        "KA": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 1.0
+        },
+        "LA": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 1.0
+        },
+        "PHA": {
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1-score": 0.6666666666666666,
+          "support": 1.0
+        },
+        "RA": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 1.0
+        },
+        "accuracy": 0.6,
+        "macro avg": {
+          "precision": 0.4,
+          "recall": 0.6,
+          "f1-score": 0.4666666666666666,
+          "support": 5.0
+        },
+        "weighted avg": {
+          "precision": 0.4,
+          "recall": 0.6,
+          "f1-score": 0.4666666666666666,
+          "support": 5.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      ],
+      "speedup_vs_all": 6.950451343044413
+    }
+  },
+  "device": "macOS-26.7.2-arm64-arm-64bit",
+  "opencv": "4.11.0",
+  "protocol": "NSL23 local train S2/S3, held-out test S1",
+  "limits": "All compressed frames are traversed with read/grab; sampled methods retrieve/resize only selected images. Incorrect frame-count metadata triggers a full-read fallback. OS file caches may be warm; descriptor caches are not reused between methods. Margin gaps are not probabilities. Validation permits a 0.02 macro-F1 drop, not a test guarantee. Cascade trains two classifiers and may spend more time on rescued clips. HOG is a simplified cell-normalized variant, not exact Dalal-Triggs HOG."
+}
